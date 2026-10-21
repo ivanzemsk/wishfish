@@ -65,14 +65,14 @@ def evaluate(s):
     fresh = s["age"] <= s["maxage"]
     if not fresh:
         problems.append("замер устарел")
-        add("nd", f"Замеру {s['age']} мин, свежим считается до {s['maxage']} мин",
+        add("nd", f"Замеру {s['age']} мин, актуальным считается до {s['maxage']} мин",
             "Сделайте новый замер и введите его.")
     data_ok = not problems
 
     accident = s["equip"] == "авария"
     if accident:
         add("crit", "Авария оборудования",
-            "Действуйте по инструкции хозяйства и предупредите ответственного.")
+            "Действуйте по инструкции хозяйства.")
 
     o2_crit = False
     if data_ok:
@@ -91,7 +91,7 @@ def evaluate(s):
         if tw > tmax:
             water.append(f"вода теплее нормы ({fmt(tw)} °C)")
             add("warn", f"Температура воды {fmt(tw)} °C — выше нормы ({fmt(tmin)}–{fmt(tmax)})",
-                "Проверьте охлаждение и кислород. Температуру нужно менять плавно.")
+                "Проверьте охлаждение и кислород. Температуру нужно менять постепенно.")
 
     if s["react"] == "вяло":
         add("warn", "Рыба ест корм слабо",
@@ -101,9 +101,9 @@ def evaluate(s):
             "Выясните причину: кислород, температура, состояние рыбы. Сколько кормить: решает рыбовод.")
     if s["left"] == "есть":
         add("warn", "После кормления остался корм",
-            "Осмотрите бассейн. Уменьшать ли следующую порцию: решает рыбовод.")
+            "Осмотрите бассейн. Уменьшать ли следующую порцию решает рыбовод.")
     if s["place"] != INDOOR and (s["wx"] == "гроза" or s["wind"] == "сильный"):
-        add("warn", "Гроза или сильный ветер, а бассейн не в помещении",
+        add("warn", "Гроза или сильный ветер.",
             "Проверьте оборудование и безопасность людей.")
 
     levels = [lv for lv, _, _ in items]
@@ -129,21 +129,21 @@ def suggest(s, ev, given):
     if ev["refusal"]:
         why.append("рыба отказывается от корма")
     if base <= 0:
-        why.append("не указано, сколько корма на сутки и сколько кормлений")
+        why.append("не указано, сколько корма на сутки и сколько раз будут кормить")
     if left is not None and left <= 0:
-        why.append("корм на сегодня по норме уже скормлен")
+        why.append("корм на сегодня уже скормлен по норме")
 
-    # Давление: поправка только при резком падении и только если есть другой признак
+    # Давление: поправка только при резком падении
     indoor = s["place"] == INDOOR
-    other = s["react"] == "вяло" or s["left"] == "есть" or bool(ev["water"])
+    other = s["react"] == "слабо" or s["left"] == "есть" or bool(ev["water"])
     out["press_would"] = (not indoor) and s["trend"] == "резко падает" and other
     out["press_on"] = out["press_would"] and bool(s["use_weather"])
     if why:
         return out
 
     rows = [
-        ("Как рыба берёт корм", s["c_ap"] if s["react"] == "вяло" else 1.0,
-         "вяло" if s["react"] == "вяло" else "как обычно"),
+        ("Как рыба ест корм", s["c_ap"] if s["react"] == "слабо" else 1.0,
+         "слабо" if s["react"] == "вяло" else "как обычно"),
         ("Остаток корма", s["c_lo"] if s["left"] == "есть" else 1.0,
          "корм остался" if s["left"] == "есть" else "корма не осталось"),
         ("Вода", s["c_wat"] if ev["water"] else 1.0,
@@ -160,11 +160,11 @@ def suggest(s, ev, given):
             notes.append("гроза или сильный ветер")
         if out["press_on"]:
             w *= s["c_press"]
-            notes.append("давление резко падает и есть другой признак")
+            notes.append("давление резко падает, проверить другие признаки")
         elif s["trend"] == "резко падает":
             notes.append("давление резко падает, но других признаков нет: порцию не меняем")
         if not notes:
-            notes.append("погода спокойная")
+            notes.append("погода хорошая")
     rows.append(("Погода", w, "; ".join(notes)))
 
     product = 1.0
@@ -274,7 +274,7 @@ S = st.session_state
 
 DEMOS = {
     "Норма": dict(o2=8.0, tw=15.0, age=0, react="как обычно", left="нет", equip="работает"),
-    "Отклонение": dict(o2=5.5, tw=19.0, age=0, react="вяло", left="нет", equip="работает"),
+    "Отклонение": dict(o2=5.5, tw=19.0, age=0, react="слабо", left="нет", equip="работает"),
     "Нет данных": dict(o2=8.0, tw=15.0, age=30, react="как обычно", left="нет", equip="работает"),
     "Авария": dict(o2=4.5, tw=15.0, age=0, react="как обычно", left="нет", equip="авария"),
 }
@@ -391,7 +391,7 @@ with st.sidebar:
 
     with st.expander("Поправки к порции"):
         st.checkbox("Учитывать погоду и давление", key="use_weather")
-        for _label, _key in [("Рыба берёт корм вяло", "c_ap"), ("Остался корм", "c_lo"),
+        for _label, _key in [("Рыба берёт корм слабо", "c_ap"), ("Остался корм", "c_lo"),
                              ("Вода вне нормы", "c_wat"), ("Гроза или сильный ветер", "c_storm"),
                              ("Давление резко падает", "c_press")]:
             st.number_input(_label, min_value=0.0, max_value=1.0, step=0.05, key=_key)
@@ -400,7 +400,7 @@ with st.sidebar:
 # ---------- шапка ----------
 st.title("Вишфиш")
 st.caption("Прототип. Подсказывает по данным, которые вы вводите вручную. "
-           "Решение и кормление — за рыбоводом.")
+           "Решение по кормлению принимает рыбовод.")
 with st.expander("Примеры для показа"):
     for _col, _name in zip(st.columns(4), DEMOS):
         _col.button(_name, key=f"demo_{_name}", on_click=cb_demo, args=(_name,))
