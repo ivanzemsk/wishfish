@@ -143,7 +143,7 @@ def suggest(s, ev, given):
 
     rows = [
         ("Как рыба ест корм", s["c_ap"] if s["react"] == "слабо" else 1.0,
-         "слабо" if s["react"] == "вяло" else "как обычно"),
+         "слабо" if s["react"] == "слабо" else "как обычно"),
         ("Остаток корма", s["c_lo"] if s["left"] == "есть" else 1.0,
          "корм остался" if s["left"] == "есть" else "корма не осталось"),
         ("Вода", s["c_wat"] if ev["water"] else 1.0,
